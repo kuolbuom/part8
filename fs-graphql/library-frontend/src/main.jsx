@@ -25,11 +25,18 @@ const query = gql`
       born
       bookCount
     }
+
+    allBooks {
+      id
+      title
+      author
+      published
+    }
   }
 `;
 
 client.query({ query }).then((response) => {
-  console.log(response.data);
+  console.log("data from server", response.data);
 });
 
 createRoot(document.getElementById("root")).render(
