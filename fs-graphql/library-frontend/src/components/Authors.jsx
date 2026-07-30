@@ -1,17 +1,8 @@
 import { gql } from "@apollo/client";
 import { useQuery } from "@apollo/client/react";
-
+import { ADD_BOOK } from "./mutations";
 //expected authors
-const ALL_AUTHORS = gql`
-  query {
-    allAuthors {
-      name
-      born
-      bookCount
-      id
-    }
-  }
-`;
+import { ALL_AUTHORS } from "./queries";
 
 const Authors = (props) => {
   //wrapp all authors in useQuery
