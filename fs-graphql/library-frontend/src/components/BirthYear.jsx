@@ -13,7 +13,7 @@ const BirthYear = () => {
 
   const submit = (event) => {
     event.preventDefault();
-    //should align with the backend
+    // Ensure the mutation name and arguments match the backend schema.
     changeBorn({ variables: { name, setBornTo: Number(born) } });
 
     setName("");
