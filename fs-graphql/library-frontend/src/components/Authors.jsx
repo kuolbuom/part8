@@ -1,6 +1,5 @@
-import { gql } from "@apollo/client";
 import { useQuery } from "@apollo/client/react";
-import { ADD_BOOK } from "./mutations";
+
 //expected authors
 import { ALL_AUTHORS } from "./queries";
 
@@ -16,7 +15,6 @@ const Authors = (props) => {
   if (!props.show) {
     return null;
   }
-  const authors = [];
 
   return (
     <div>

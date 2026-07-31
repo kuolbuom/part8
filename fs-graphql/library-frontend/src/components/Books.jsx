@@ -1,4 +1,3 @@
-import { gql } from "@apollo/client";
 import { useQuery } from "@apollo/client/react";
 
 //expected books
@@ -16,8 +15,6 @@ const Books = (props) => {
   if (!props.show) {
     return null;
   }
-
-  const books = [];
 
   return (
     <div>
