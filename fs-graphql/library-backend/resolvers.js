@@ -101,7 +101,25 @@ const resolvers = {
       return await Book.countDocuments({});
     },
     // bookCount: () => books.length,
-    allBooks: async () => {
+    allBooks: async (root, args) => {
+      const filter = {};
+
+      if (args.author) {
+        const author = await Author.findOne({
+          name: args.author,
+        });
+
+        if (!author) {
+          return [];
+        }
+
+        filter.author = author._id;
+      }
+
+      if (!args.genre) {
+        filter.genres = args.genre;
+      }
+
       return Book.find({}).populate("author");
     },
     // allBooks: (root, args) => {
