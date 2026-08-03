@@ -13,7 +13,9 @@
   "dependencies": {
     "@apollo/client": "^4.2.8",
     "@apollo/server": "^5.5.0",
+    "dotenv": "^17.4.2",
     "graphql": "^16.13.2",
+    "mongoose": "^9.9.1",
     "uuid": "^14.0.1"
   }
 }
