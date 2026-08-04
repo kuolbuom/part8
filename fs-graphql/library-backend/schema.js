@@ -14,6 +14,16 @@ const typeDefs = `
    bookCount: Int!
   }
 
+  type User {
+    username: String!
+    favoriteGenre: String!
+    id: ID!
+}
+
+type Token {
+  value: String!
+}
+
   type Query {
     bookCount: Int!
     allBooks(author: String, genre: String): [Book!]!
@@ -22,6 +32,7 @@ const typeDefs = `
     authorCount: Int!
     allAuthors: [Author!]!
     findAuthor(name: String!):Author
+    me: User
   }
 
   type Mutation {
@@ -35,6 +46,14 @@ const typeDefs = `
       name: String!
       setBornTo: Int!
     ):Author
+    createUser(
+      username: String!
+      favoriteGenre: String!
+  ): User
+  login(
+    username: String!
+    password: String!
+  ): Token
   }
 `;
 
