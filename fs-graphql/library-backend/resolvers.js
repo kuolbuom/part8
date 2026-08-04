@@ -1,15 +1,15 @@
 require("dotenv").config();
 
 const { GraphQLError } = require("graphql");
-
 const jwt = require("jsonwebtoken");
 const User = require("./models/user");
 
-const Book = require("./models/books");
-const Author = require("./models/authors");
+const Book = require("./models/book");
+const Author = require("./models/author");
 
 const JWT_SECRET = process.env.JWT_SECRET;
 console.log("JWT_SECRET", JWT_SECRET);
+
 // let authors = [
 //   {
 //     name: "Robert Martin",
@@ -105,6 +105,7 @@ console.log("JWT_SECRET", JWT_SECRET);
 // ];
 
 const resolvers = {
+  //query resolver
   Query: {
     bookCount: async () => {
       return await Book.countDocuments({});
@@ -179,6 +180,7 @@ const resolvers = {
     },
   },
 
+  //mutation resolvers
   Mutation: {
     addBook: async (root, args, context) => {
       //Protect addBook
@@ -252,12 +254,14 @@ const resolvers = {
       //   authors = authors.map((a) => (a.name === args.name ? updatedAuthor : a));
       //   return updatedAuthor;
     },
+
+    //edite author
     editAuthor: async (root, args, context) => {
       //PROTECT EDITAUTHOR
       const currentUser = context.currentUser;
 
       if (!currentUser) {
-        throw new QraphQLError("Not authenticated", {
+        throw new GraphQLError("Not authenticated", {
           extensions: {
             code: "BAD_USER_INPUT",
           },
@@ -279,7 +283,7 @@ const resolvers = {
 
         return author;
       } catch (error) {
-        throw new QraphQLError(error.message, {
+        throw new GraphQLError(error.message, {
           extensions: {
             code: "BAD_USER_INPUT",
             invalidArgs: args,
@@ -288,6 +292,8 @@ const resolvers = {
         });
       }
     },
+
+    //create user
     createUser: async (root, args) => {
       const user = new User({
         username: args.username,
@@ -304,6 +310,8 @@ const resolvers = {
         });
       });
     },
+
+    //login user
     login: async (root, args) => {
       const user = await User.findOne({ username: args.username });
 
@@ -321,6 +329,19 @@ const resolvers = {
       };
 
       return { value: jwt.sign(userForToken, JWT_SECRET) };
+    },
+
+    //reset database
+    _resetDatabase: async () => {
+      if (process.env.NODE_ENV !== "test") {
+        throw new GraphQLError("_resetDatabase is only available in test mode");
+      }
+
+      await Author.deleteMany({});
+      await Book.deleteMany({});
+      await User.deleteMany({});
+
+      return true;
     },
   },
 };
