@@ -25,6 +25,11 @@ jobs:
         working-directory: fs-graphql/tests-chapter4
         run: npm ci
 
+      - name: Create backend .env
+        working-directory: fs-graphql/library-backend
+        run: |
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" > .env
+
       - name: Run tests
         working-directory: fs-graphql/tests-chapter4
         run: npm test
