@@ -7,9 +7,6 @@ const User = require("./models/user");
 const Book = require("./models/book");
 const Author = require("./models/author");
 
-const JWT_SECRET = process.env.JWT_SECRET;
-console.log("JWT_SECRET", JWT_SECRET);
-
 // let authors = [
 //   {
 //     name: "Robert Martin",
@@ -328,7 +325,7 @@ const resolvers = {
         id: user._id,
       };
 
-      return { value: jwt.sign(userForToken, JWT_SECRET) };
+      return { value: jwt.sign(userForToken, process.env.JWT_SECRET) };
     },
 
     //reset database

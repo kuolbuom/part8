@@ -10,8 +10,6 @@ const typeDefs = require("./schema");
 const resolvers = require("./resolvers");
 const User = require("./models/user");
 
-const JWT_SECRET = process.env.JWT_SECRET;
-
 const startServer = (port) => {
   const server = new ApolloServer({
     typeDefs,
@@ -35,7 +33,10 @@ const startServer = (port) => {
       //If the header starts with "Bearer "
       if (auth && auth.startsWith("Bearer ")) {
         //Extract the token
-        const decodedToken = jwt.verify(auth.substring(7), JWT_SECRET);
+        const decodedToken = jwt.verify(
+          auth.substring(7),
+          process.env.JWT_SECRET,
+        );
         //Find the user
         const currentUser = await User.findById(decodedToken.id);
         //Return
