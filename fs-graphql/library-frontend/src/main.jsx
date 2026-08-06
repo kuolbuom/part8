@@ -2,16 +2,37 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.jsx";
 
-import { ApolloClient, gql, HttpLink, InMemoryCache } from "@apollo/client";
+import {
+  ApolloClient,
+  ApolloLink,
+  gql,
+  HttpLink,
+  InMemoryCache,
+} from "@apollo/client";
 //using this made the client accessible for all components of the application by wrapping the App with it
 import { ApolloProvider } from "@apollo/client/react";
 
+//frontend is sending the JWT token to the backend.
+const authLink = new ApolloLink((operation, forward) => {
+  const token = localStorage.getItem("library-user-token");
+
+  operation.setContext({
+    headers: {
+      authorization: token ? `Bearer ${token}` : "",
+    },
+  });
+
+  return forward(operation);
+});
+
 //client constructor
 //the code creates a new client object, which is then used to send a query to the server
+const httpLink = new HttpLink({
+  uri: "http://localhost:4000",
+});
+
 const client = new ApolloClient({
-  link: new HttpLink({
-    uri: "http://localhost:4000",
-  }),
+  link: authLink.concat(httpLink),
   cache: new InMemoryCache(),
 });
 

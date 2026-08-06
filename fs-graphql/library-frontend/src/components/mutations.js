@@ -16,7 +16,10 @@ export const ADD_BOOK = gql`
       title
       published
       genres
-      author
+      author {
+        id
+        name
+      }
     }
   }
 `;
