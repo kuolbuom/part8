@@ -29,7 +29,9 @@ const query = gql`
     allBooks {
       id
       title
-      author
+      author {
+        name
+      }
       published
     }
   }
