@@ -41,6 +41,9 @@ const NewBook = (props) => {
   };
 
   const addGenre = () => {
+    //Prevent empty genres
+    if (genre.trim() === "") return;
+
     setGenres(genres.concat(genre));
     setGenre("");
   };
