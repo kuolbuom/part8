@@ -8,23 +8,38 @@ const Books = (props) => {
   const [selectedGenre, setSelectedGenre] = useState(null);
 
   //wrapp all books in useQuery
-  const result = useQuery(ALL_BOOKS);
+  // const result = useQuery(ALL_BOOKS);
+  const allBooksResult = useQuery(ALL_BOOKS);
+
+  const filteredBooksResult = useQuery(ALL_BOOKS, {
+    variables: { genre: selectedGenre },
+  });
 
   // console.log("all books", result);
   //displaying before data
-  if (result.loading) {
+  if (allBooksResult.loading || filteredBooksResult.loading) {
     return <div>loading...</div>;
   }
 
   //Filter the books
-  const booksToShow = selectedGenre
-    ? result.data.allBooks.filter((book) => book.genres.includes(selectedGenre))
-    : result.data.allBooks;
+  // const booksToShow = selectedGenre
+  //   ? result.data.allBooks.filter((book) => book.genres.includes(selectedGenre))
+  //   : result.data.allBooks;
+  const booksToShow = filteredBooksResult.data.allBooks;
 
   //Get all unique genres From result.data.allBooks
+  // const genres = [
+  //   ...new Set(
+  //     result.data.allBooks
+  //       .flatMap((book) => book.genres)
+  //       .filter((genre) => genre !== ""),
+  //   ), //this filter, Hide existing empty genres
+  // ];
+
+  //Build genres from all books
   const genres = [
     ...new Set(
-      result.data.allBooks
+      allBooksResult.data.allBooks
         .flatMap((book) => book.genres)
         .filter((genre) => genre !== ""),
     ), //this filter, Hide existing empty genres
@@ -35,7 +50,7 @@ const Books = (props) => {
   }
 
   console.log("Genres:", genres);
-  console.log("Books:", result.data.allBooks);
+  console.log("Books:", allBooksResult.data.allBooks);
 
   return (
     <div>
