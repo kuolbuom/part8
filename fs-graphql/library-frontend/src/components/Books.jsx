@@ -11,8 +11,10 @@ const Books = (props) => {
   // const result = useQuery(ALL_BOOKS);
   const allBooksResult = useQuery(ALL_BOOKS);
 
+  //the books view is updated at least when a genre selection button is pressed
   const filteredBooksResult = useQuery(ALL_BOOKS, {
     variables: { genre: selectedGenre },
+    fetchPolicy: "network-only",
   });
 
   // console.log("all books", result);

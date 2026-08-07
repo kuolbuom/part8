@@ -5,8 +5,18 @@ import { ALL_BOOKS, ALL_AUTHORS } from "./queries";
 import { ADD_BOOK } from "./mutations";
 
 const NewBook = (props) => {
+  const updateCache = (cache, query, addedBook) => {
+    cache.updateQuery(query, ({ allBooks }) => {
+      return {
+        allBooks: allBooks.concat(addedBook),
+      };
+    });
+  };
   const [addBook] = useMutation(ADD_BOOK, {
-    refetchQueries: [{ query: ALL_BOOKS }, { query: ALL_AUTHORS }],
+    refetchQueries: [{ query: ALL_AUTHORS }],
+    update: (cache, response) => {
+      updateCache(cache, { query: ALL_BOOKS }, response.data.addBook);
+    },
   });
 
   const [title, setTitle] = useState("");
@@ -21,8 +31,14 @@ const NewBook = (props) => {
 
   const submit = async (event) => {
     event.preventDefault();
+    console.log({
+      title,
+      author,
+      published,
+      genres,
+    });
 
-    addBook({
+    await addBook({
       variables: {
         title,
         author,
