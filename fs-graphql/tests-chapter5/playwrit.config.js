@@ -30,7 +30,7 @@ module.exports = defineConfig({
     {
       command: "npm run dev",
       cwd: "../library-frontend",
-      url: "http://localhost:5173",
+      url: "http://127.0.0.1:5173",
       timeout: 30000,
       reuseExistingServer: false,
     },
