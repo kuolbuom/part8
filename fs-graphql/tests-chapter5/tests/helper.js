@@ -1,4 +1,5 @@
-const GRAPHQL_URL = "http://localhost:4000";
+//url: "http://localhost:4000", work locally
+const GRAPHQL_URL = "http://127.0.0.1:4000";
 
 const TEST_USER = { username: "testuser", favoriteGenre: "refactoring" };
 const TEST_PASSWORD = "secret";
