@@ -3,10 +3,17 @@ const path = require("path");
 const { MongoMemoryServer } = require("mongodb-memory-server");
 
 const start = async () => {
+  console.log("Starting MongoMemoryServer...");
+
   const mongoServer = await MongoMemoryServer.create();
   const uri = mongoServer.getUri();
 
+  console.log("MongoDB URI:", uri);
+
   const backendDir = path.resolve(__dirname, "../../library-backend");
+
+  console.log("Backend directory:", backendDir);
+  console.log("Starting backend on port 4000...");
 
   const serverProcess = spawn("node", ["index.js"], {
     cwd: backendDir,
@@ -21,23 +28,33 @@ const start = async () => {
   });
 
   serverProcess.stdout.on("data", (data) => {
-    const output = data.toString();
-    process.stdout.write(output);
+    console.log(`[BACKEND] ${data.toString()}`);
   });
 
   serverProcess.stderr.on("data", (data) => {
-    process.stderr.write(data.toString());
+    console.error(`[BACKEND ERROR] ${data.toString()}`);
   });
 
-  process.on("SIGTERM", () => {
-    serverProcess.kill();
-    mongoServer.stop();
+  serverProcess.on("error", (error) => {
+    console.error("[BACKEND PROCESS ERROR]", error);
   });
 
-  process.on("SIGINT", () => {
+  serverProcess.on("exit", (code, signal) => {
+    console.error(`[BACKEND EXITED] code=${code}, signal=${signal}`);
+  });
+
+  process.on("SIGTERM", async () => {
     serverProcess.kill();
-    mongoServer.stop();
+    await mongoServer.stop();
+  });
+
+  process.on("SIGINT", async () => {
+    serverProcess.kill();
+    await mongoServer.stop();
   });
 };
 
-start();
+start().catch((error) => {
+  console.error("[START TEST BACKEND ERROR]", error);
+  process.exit(1);
+});

@@ -17,7 +17,7 @@ const startServer = (port) => {
   });
 
   startStandaloneServer(server, {
-    listen: { port: 4000 },
+    listen: { port },
 
     context: async ({ req }) => {
       console.log("req:", !!req);
