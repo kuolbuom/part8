@@ -26,7 +26,11 @@ const BirthYear = ({ authors }) => {
       <form onSubmit={submit}>
         <div>
           name
-          <select value={name} onChange={({ target }) => setName(target.value)}>
+          <select
+            name="name"
+            value={name}
+            onChange={({ target }) => setName(target.value)}
+          >
             {authors.map((author) => (
               <option key={author.name} value={author.name}>
                 {author.name}
@@ -41,12 +45,14 @@ const BirthYear = ({ authors }) => {
         </div>
 
         <div>
-          born
-          <input
-            type="text"
-            value={born}
-            onChange={({ target }) => setBorn(target.value)}
-          />
+          <label>
+            born
+            <input
+              type="text"
+              value={born}
+              onChange={({ target }) => setBorn(target.value)}
+            />
+          </label>
         </div>
         <button type="submit">update author</button>
       </form>

@@ -38,7 +38,7 @@ const LoginForm = ({ setToken, setPage, show }) => {
       <form onSubmit={handleLogin}>
         <div>
           <label>
-            name
+            username
             <input
               type="text"
               value={username}
