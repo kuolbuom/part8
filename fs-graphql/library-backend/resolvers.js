@@ -316,9 +316,9 @@ const resolvers = {
         }
 
         author.born = args.setBornTo;
-
+        console.log("EDIT AUTHOR:", args.name, args.setBornTo);
         await author.save();
-
+        console.log("SAVED AUTHOR:", author.name, author.born);
         return author;
       } catch (error) {
         throw new GraphQLError(error.message, {

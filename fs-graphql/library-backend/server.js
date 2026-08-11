@@ -105,7 +105,7 @@ const startServer = async (port) => {
     }),
   );
 
-  httpServer.listen(port, "127.0.0.1", () => {
+  httpServer.listen(port, "0.0.0.0", () => {
     console.log(`Server ready at http://127.0.0.1:${port}/graphql`);
     // console.log(`Subscriptions ready at ws://127.0.0.1:${port}/graphql`);
   });

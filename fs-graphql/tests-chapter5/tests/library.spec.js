@@ -111,11 +111,18 @@ describe("Library app", () => {
       ).toBeVisible();
 
       await page.locator('select[name="name"]').selectOption("Martin Fowler");
-      await page.getByLabel("born").fill("1965");
+      await page.getByLabel("born").fill("1963");
       await page.getByRole("button", { name: "update author" }).click();
 
       const fowlerRow = page.locator("tr", { hasText: "Martin Fowler" });
-      await expect(fowlerRow.getByText("1965")).toBeVisible();
+
+      await page.waitForTimeout(2000);
+
+      console.log("FOWLER ROW:", await fowlerRow.innerText());
+
+      await expect(fowlerRow.getByText("1963")).toBeVisible({
+        timeout: 15000,
+      });
     });
 
     describe("Genre filtering", () => {

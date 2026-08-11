@@ -6,7 +6,10 @@ import { ALL_AUTHORS } from "./queries";
 const Authors = (props) => {
   //wrapp all authors in useQuery
   const result = useQuery(ALL_AUTHORS);
-
+  console.log(
+    "AUTHORS RESULT:",
+    result.data?.allAuthors?.find((a) => a.name === "Martin Fowler"),
+  );
   //displaying before data
   if (result.loading) {
     return <div>loading...</div>;

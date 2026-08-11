@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { EDIT_BORN } from "./queries";
+import { EDIT_BORN, ALL_AUTHORS } from "./queries";
 
 import { useMutation } from "@apollo/client/react";
 
@@ -8,14 +8,35 @@ const BirthYear = ({ authors }) => {
   const [born, setBorn] = useState(authors[0]?.name || "");
 
   const [changeBorn] = useMutation(EDIT_BORN, {
-    refetchQueries: [{ query: EDIT_BORN }],
+    update(cache, { data }) {
+      const updatedAuthor = data?.editAuthor;
+
+      if (!updatedAuthor) return;
+
+      cache.modify({
+        id: cache.identify(updatedAuthor),
+        fields: {
+          born: () => updatedAuthor.born,
+        },
+      });
+    },
   });
 
-  const submit = (event) => {
+  // const [changeBorn] = useMutation(EDIT_BORN, {
+  //   refetchQueries: [{ query: ALL_AUTHORS }],
+  //   onQueryUpdated: (observableQuery) => {
+  //     console.log("REFETCHING ALL_AUTHORS");
+  //     return observableQuery.refetch();
+  //   },
+  // });
+
+  const submit = async (event) => {
     event.preventDefault();
     // Ensure the mutation name and arguments match the backend schema.
-    changeBorn({ variables: { name, setBornTo: Number(born) } });
-
+    const result = await changeBorn({
+      variables: { name, setBornTo: Number(born) },
+    });
+    console.log("EDIT RESULT:", result);
     setName("");
     setBorn("");
   };
