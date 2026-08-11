@@ -24,13 +24,13 @@ jobs:
 
       - name: Start library backend
         working-directory: fs-graphql/library-backend
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
         run: |
           npm start > backend.log 2>&1 &
-          sleep 5
+          sleep 10
           cat backend.log
-          curl -i -X POST http://127.0.0.1:4000/graphql \
-            -H "Content-Type: application/json" \
-            --data '{"query":"{ __typename }"}'
+          curl http://127.0.0.1:4000/graphql
 
       - name: Install library-frontend dependencies
         working-directory: fs-graphql/library-frontend
