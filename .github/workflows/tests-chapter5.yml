@@ -24,7 +24,13 @@ jobs:
 
       - name: Start library backend
         working-directory: fs-graphql/library-backend
-        run: npm start &
+        run: |
+          npm start > backend.log 2>&1 &
+          sleep 5
+          cat backend.log
+          curl -i -X POST http://127.0.0.1:4000/graphql \
+            -H "Content-Type: application/json" \
+            --data '{"query":"{ __typename }"}'
 
       - name: Install library-frontend dependencies
         working-directory: fs-graphql/library-frontend
