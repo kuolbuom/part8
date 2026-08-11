@@ -8,7 +8,13 @@ import {
   gql,
   HttpLink,
   InMemoryCache,
+  split,
 } from "@apollo/client";
+
+import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
+import { createClient } from "graphql-ws";
+import { getMainDefinition } from "@apollo/client/utilities";
+
 //using this made the client accessible for all components of the application by wrapping the App with it
 import { ApolloProvider } from "@apollo/client/react";
 
@@ -28,11 +34,32 @@ const authLink = new ApolloLink((operation, forward) => {
 //client constructor
 //the code creates a new client object, which is then used to send a query to the server
 const httpLink = new HttpLink({
-  uri: "http://localhost:4000",
+  uri: "http://127.0.0.1:4000/graphql",
 });
 
+//create the WebSocket link
+const wsLink = new GraphQLWsLink(
+  createClient({
+    url: "ws://127.0.0.1:4000/graphql",
+  }),
+);
+
+//Then we use split() to tell Apollo: If this operation is a subscription, use WebSocket. Otherwise use HTTP.
+const splitLink = split(
+  ({ query }) => {
+    const definition = getMainDefinition(query);
+
+    return (
+      definition.kind === "OperationDefinition" &&
+      definition.operation === "subscription"
+    );
+  },
+  wsLink,
+  authLink.concat(httpLink),
+);
+
 const client = new ApolloClient({
-  link: authLink.concat(httpLink),
+  link: splitLink,
   cache: new InMemoryCache(),
 });
 

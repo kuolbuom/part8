@@ -1,11 +1,15 @@
 require("dotenv").config();
 
+const { PubSub } = require("graphql-subscriptions");
+
 const { GraphQLError } = require("graphql");
 const jwt = require("jsonwebtoken");
 const User = require("./models/user");
 
 const Book = require("./models/book");
 const Author = require("./models/author");
+//this constructs a new pubsub or is basically our messenger
+const pubsub = new PubSub();
 
 // let authors = [
 //   {
@@ -152,10 +156,36 @@ const resolvers = {
     authorCount: async () => {
       return await Author.countDocuments({});
     },
+
     // authorCount: () => authors.length,
+    // allAuthors: async () => {
+    //   return Author.find({});
+    // },
+
+    //resolving n+1 problem
     allAuthors: async () => {
-      return Author.find({});
+      const authors = await Author.aggregate([
+        {
+          $lookup: {
+            from: "books",
+            localField: "_id",
+            foreignField: "author",
+            as: "books",
+          },
+        },
+        {
+          $project: {
+            id: { $toString: "$_id" },
+            name: 1,
+            born: 1,
+            bookCount: { $size: "$books" },
+          },
+        },
+      ]);
+
+      return authors;
     },
+
     // allAuthors: () => authors,
     findAuthor: async (root, args) => {
       return await Author.findOne({
@@ -168,14 +198,17 @@ const resolvers = {
     },
   },
   //Exercise 3. All author
-  Author: {
-    bookCount: async (root) => {
-      return await Book.countDocuments({
-        author: root._id,
-      });
-      // return books.filter((book) => book.author === root.name).length;
-    },
-  },
+
+  // author removed and replaced with aggregation in query resolver
+
+  // Author: {
+  //   bookCount: async (root) => {
+  //     return await Book.countDocuments({
+  //       author: root._id,
+  //     });
+  //     // return books.filter((book) => book.author === root.name).length;
+  //   },
+  // },
 
   //mutation resolvers
   Mutation: {
@@ -219,7 +252,15 @@ const resolvers = {
 
         await book.save();
 
-        return book.populate("author");
+        // return book.populate("author");
+        //change due to subscription
+        const populatedBook = await book.populate("author");
+
+        pubsub.publish("BOOK_ADDED", {
+          bookAdded: populatedBook,
+        });
+
+        return populatedBook;
         //   if (!author) {
       } catch (error) {
         throw new GraphQLError(error.message, {
@@ -339,6 +380,13 @@ const resolvers = {
       await User.deleteMany({});
 
       return true;
+    },
+  },
+
+  //SUBCRIPTION RESOLVER "Whenever the BOOK_ADDED event happens, give me the book."
+  Subscription: {
+    bookAdded: {
+      subscribe: () => pubsub.asyncIterator(["BOOK_ADDED"]),
     },
   },
 };

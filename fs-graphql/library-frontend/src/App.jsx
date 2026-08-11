@@ -5,9 +5,34 @@ import NewBook from "./components/NewBook";
 import LoginForm from "./components/LoginForm";
 import Recommendations from "./components/Recommendations";
 
+import { useApolloClient, useSubscription } from "@apollo/client/react";
+import { BOOK_ADDED, ALL_BOOKS } from "./components/queries";
+
 const App = () => {
+  const client = useApolloClient();
+
   const [page, setPage] = useState("authors");
   const [token, setToken] = useState(null);
+  //subscription code
+  useSubscription(BOOK_ADDED, {
+    onData: async ({ data }) => {
+      console.log("SUBSCRIPTION DATA:", data);
+      const book = data.data?.bookAdded;
+
+      if (!book) return;
+
+      console.log("New book added:", book);
+      window.alert(`New book added: ${book.title}`);
+
+      await client.refetchQueries({
+        include: [ALL_BOOKS],
+      });
+    },
+
+    onComplete: () => {
+      console.log("Subscription completed");
+    },
+  });
 
   useEffect(() => {
     const token = localStorage.getItem("library-user-token");

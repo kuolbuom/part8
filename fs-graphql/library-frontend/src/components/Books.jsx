@@ -9,17 +9,26 @@ const Books = (props) => {
 
   //wrapp all books in useQuery
   // const result = useQuery(ALL_BOOKS);
-  const allBooksResult = useQuery(ALL_BOOKS);
+  const allBooksResult = useQuery(ALL_BOOKS, {
+    skip: !props.show,
+  });
+
+  if (!props.show) {
+    return null;
+  }
 
   //the books view is updated at least when a genre selection button is pressed
-  const filteredBooksResult = useQuery(ALL_BOOKS, {
-    variables: { genre: selectedGenre },
-    fetchPolicy: "network-only",
-  });
+  // const filteredBooksResult = useQuery(ALL_BOOKS, {
+  //   variables: { genre: selectedGenre },
+  //   fetchPolicy: "network-only",
+  // });
 
   // console.log("all books", result);
   //displaying before data
-  if (allBooksResult.loading || filteredBooksResult.loading) {
+  // if (allBooksResult.loading || filteredBooksResult.loading) {
+  //   return <div>loading...</div>;
+  // }
+  if (allBooksResult.loading) {
     return <div>loading...</div>;
   }
 
@@ -27,7 +36,13 @@ const Books = (props) => {
   // const booksToShow = selectedGenre
   //   ? result.data.allBooks.filter((book) => book.genres.includes(selectedGenre))
   //   : result.data.allBooks;
-  const booksToShow = filteredBooksResult.data.allBooks;
+  // const booksToShow = filteredBooksResult.data.allBooks;
+
+  const booksToShow = selectedGenre
+    ? allBooksResult.data.allBooks.filter((book) =>
+        book.genres.includes(selectedGenre),
+      )
+    : allBooksResult.data.allBooks;
 
   //Get all unique genres From result.data.allBooks
   // const genres = [
@@ -46,10 +61,6 @@ const Books = (props) => {
         .filter((genre) => genre !== ""),
     ), //this filter, Hide existing empty genres
   ];
-
-  if (!props.show) {
-    return null;
-  }
 
   console.log("Genres:", genres);
   console.log("Books:", allBooksResult.data.allBooks);
