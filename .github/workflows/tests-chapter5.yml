@@ -22,6 +22,10 @@ jobs:
         working-directory: fs-graphql/library-backend
         run: npm ci
 
+      - name: Start library backend
+        working-directory: fs-graphql/library-backend
+        run: npm start &
+
       - name: Install library-frontend dependencies
         working-directory: fs-graphql/library-frontend
         run: npm ci
