@@ -64,6 +64,9 @@ const seedDatabase = async (request) => {
     }`,
     { username: TEST_USER.username, password: TEST_PASSWORD },
   );
+
+  console.log("LOGIN RESULT:", JSON.stringify(loginResult, null, 2));
+
   const token = loginResult.data.login.value;
 
   for (const book of initialBooks) {
