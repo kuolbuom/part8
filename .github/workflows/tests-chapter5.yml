@@ -26,6 +26,8 @@ jobs:
         working-directory: fs-graphql/library-backend
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          NODE_ENV: test
         run: |
           npm start > backend.log 2>&1 &
           sleep 10
