@@ -1,0 +1,264 @@
+Step 1 — Frontend dev.Dockerfile
+We start here
+Learn how Docker prepares the React development environment.
+
+
+
+
+Step 2 — Backend dev.Dockerfile
+Prepare the Node.js and Express development environment.
+
+
+
+
+Step 3 — nginx.dev.conf
+Learn how Nginx forwards frontend API requests to the backend.
+
+
+
+
+Step 4 — docker-compose.dev.yml
+Connect the frontend, backend, and Nginx into one development environment.
+
+
+
+
+Step 5 — Test and submit
+Run the app, troubleshoot it, and add the repository link to README.md.
+
+Step 1: Frontend dev.Dockerfile
+1. First, understand the picture
+Imagine that your React frontend is a small workshop. It needs Node.js, npm, your source code, and the packages your project depends on.
+Docker builds a container environment with the tools required to run that workshop.
+
+Your frontend source code
+React components, package.json, Vite configuration
+
+Frontend dev.Dockerfile
+Instructions for preparing the environment
+
+Docker image
+A prepared environment with Node.js, dependencies, and app files
+
+Running frontend container
+Runs the development server so you can work on the app
+
+The important distinction:
+- Dockerfile: instructions for building the environment.
+- Image: the prepared template produced by those instructions.
+- Container: a running instance of that image.
+
+
+Line 1 — FROM node:24
+FROM node:24
+
+
+Meaning: Start with an existing image that already contains Node.js 24.
+Think of it like renting an equipped workshop instead of constructing every tool yourself.
+Node.js base image
+
+- Linux environment
+- Node.js runtime
+- npm package manager
+
+Without this, you would need to choose and install a suitable runtime yourself.
+
+Line 2 — WORKDIR /usr/src/app
+WORKDIR /usr/src/app
+
+
+Meaning: Set the working directory inside the container.
+Imagine walking into your workshop and deciding that /usr/src/app is where all the work will happen.
+Container filesystem
+└── usr/
+    └── src/
+        └── app/     ← our working directory
+
+
+Commands such as RUN npm install will run from this directory unless another directory is specified.
+Docker creates the directory if it doesn't already exist.
+
+Lines 3–4 — Copy package files and install dependencies
+COPY package*.json ./
+
+RUN npm install
+
+
+This is an important part of understanding Docker builds.
+First, COPY package*.json ./ copies matching package files, such as package.json and package-lock.json, from the build context into the working directory.
+Then, RUN npm install installs the dependencies declared by the project.
+Picture it like this:
+Your project
+package.json + package-lock.json
+
+COPY package*.json ./
+
+RUN npm install
+
+Installed packages in node_modules
+
+
+Why copy package files first?
+Docker can reuse cached build layers when these files haven't changed. If you edit a React component but leave the package files unchanged, Docker may reuse the dependency-installation layer instead of installing everything again.
+For reproducible installs, npm ci is often preferable when a valid package-lock.json exists. We can choose that based on your actual project.
+
+Line 5 — COPY . .
+COPY . .
+
+
+Meaning: Copy the rest of the files from the build context into the container's working directory.
+For example:
+Your frontend project          Container
+─────────────────────          ─────────
+src/                         → /usr/src/app/src/
+public/                      → /usr/src/app/public/
+index.html                   → /usr/src/app/index.html
+vite.config.js               → /usr/src/app/vite.config.js
+
+
+This copies files into the image during the build. It does not automatically keep your local files synchronized with the container. Later, we'll discuss how Compose volumes enable live development.
+
+
+Line 6 — Start the development server
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+
+
+This tells the container what command to run by default when it starts.
+- npm run dev runs the development script from package.json.
+- -- tells npm to pass the following arguments to the script.
+- --host 0.0.0.0 allows Vite to listen on the container's network interfaces, rather than only its internal loopback address.
+Why does this matter? A server listening only on localhost inside the container may not be reachable from outside it. Binding to 0.0.0.0 makes it possible for Docker networking and port mapping to expose the development server.
+One more important distinction: the Dockerfile does not itself publish a port. We will configure the port mapping later in docker-compose.dev.yml.
+
+4. Your turn: let's connect this to your actual project
+Before we build anything, I want you to find the correct frontend directory. That way, you will learn the process using your own files rather than an imaginary project.
+Open PowerShell and navigate to your existing Todo frontend project:
+cd C:\Users\Student\Desktop\part12\fs-containers\todo-app\todo-frontend
+
+
+Then run:
+Get-ChildItem
+
+
+Look for package.json, package-lock.json, src, and vite.config.js.
+Now open package.json and check the scripts section. You can display it with:
+Get-Content package.json
+
+Perfect! Now we're using your Full Stack Open Part 8 — Library application, with a React frontend, Vite, and Apollo Client. That makes this exercise more valuable because you're learning Docker using a real project you built yourself.
+We'll continue one step at a time. We are still working only on the frontend.
+Step 1.1 — Understand your frontend before Docker
+From your package.json, we know your frontend uses:
+Item	Purpose
+React	Builds the user interface
+Vite	Runs the frontend development server
+Apollo Client	Connects the frontend to a GraphQL API
+GraphQL	Defines how the frontend communicates with the API
+npm run dev	Starts your Vite development server
+The most important discovery is this line:
+"dev": "vite"
+
+
+It tells us that npm run dev is the correct command to start your frontend in development mode.
+Step 1.2 — Picture what we're building
+Your existing project
+React + Vite + package.json
+
+frontend/dev.Dockerfile
+Instructions to prepare the frontend environment
+
+Frontend container
+Runs Vite and serves your React application
+
+
+One key idea: we are not rewriting your React application. We are creating a reproducible environment in which it can run.
+Step 1.3 — Choose the right installation command
+Your package.json lists the dependencies, but I haven't yet confirmed whether your project has a package-lock.json.
+There are two possible commands:
+- npm install — installs dependencies and can update the lockfile.
+- npm ci — installs dependencies from an existing lockfile, requires it to match package.json, and is generally better suited to repeatable builds.
+Let's check before choosing.
+Run this in your current PowerShell terminal:
+
+Get-ChildItem package.json, package-lock.json
+
+
+
+If package-lock.json exists, we'll use npm ci. If it doesn't, we'll use npm install for now.
+
+Step 1.4 — Create dev.Dockerfile
+First, understand npm ci
+Your two files have different responsibilities:
+
+package.json
+Describes the dependencies your application needs, such as React, Vite, and Apollo Client.
+
+
+
+
+package-lock.json
+Records the resolved dependency versions so installations can be reproduced consistently.
+
+
+
+
+npm ci
+Installs dependencies using the lockfile. It fails if the lockfile and package.json are inconsistent, rather than silently updating the lockfile.
+
+
+Follow the build process
+
+Think of it like following a recipe: package.json describes what you need, while package-lock.json records the specific versions to use.
+
+1
+
+FROM node:24
+Start from an image that already has Node.js 24 installed.
+
+
+
+2
+
+WORKDIR /usr/src/app
+Choose the directory inside the image where the application will live.
+
+
+
+3
+
+COPY package*.json ./
+Copy the package manifests first, before copying the rest of the code. This helps Docker reuse its cached dependency layer.
+
+
+
+4
+
+RUN npm ci
+Install the locked dependencies during the image build.
+
+
+
+5
+
+COPY . .
+Copy the remaining frontend files into the image. We'll also need to think about excluding local node_modules using .dockerignore.
+
+
+
+6
+
+CMD [...]
+Set the default command that starts Vite when the container runs. Binding to 0.0.0.0 lets it accept connections through the container's network.
+
+Step 1 — Let's correct our location
+In PowerShell, run:
+cd C:\Users\Student\Desktop\part8\fs-graphql
+
+
+Then check your files:
+Get-ChildItem
+
+1. Create the folders and file
+Run these commands in your current PowerShell terminal:
+
+New-Item -ItemType Directory -Force my-app\frontend
+New-Item -ItemType File -Force my-app\frontend\d

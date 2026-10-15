@@ -1,0 +1,74 @@
+Step 2 — Create the backend dev.Dockerfile
+Your backend's package.json tells us two important things:
+"start": "node index.js",
+"dev": "node --watch index.js"
+
+
+- npm start runs the server normally.
+- npm run dev runs the server with Node.js's built-in watch mode, which restarts it when watched files change.
+For a development environment, we'll use npm run dev.
+
+1. Picture what we're building
+Your backend source
+index.js + package.json + GraphQL code
+
+my-app/backend/dev.Dockerfile
+Instructions for preparing the backend environment
+
+Running backend container
+Runs your GraphQL server in development mode
+
+2. Create the file
+You're currently in library-backend. Run:
+New-Item -ItemType Directory -Force ..\my-app\backend
+New-Item -ItemType File -Force ..\my-app\backend\dev.Dockerfile
+
+3. Understand the differences
+Instruction	What it means
+FROM node:24	Start with an image containing Node.js 24.
+WORKDIR /usr/src/app	Choose the working directory inside the container.
+COPY package*.json ./	Copy the dependency manifests.
+RUN npm ci	Install the dependencies from the lockfile.
+COPY . .	Copy the backend source files into the image.
+CMD ["npm", "run", "dev"]	Start the GraphQL server in development mode.
+The frontend and backend Dockerfiles look similar because both use Node.js and npm. The main difference is the command that starts each application.
+- Frontend: npm run dev -- --host 0.0.0.0
+- Backend: npm run dev
+We'll handle network access and port configuration in Docker Compose.
+
+Yes, exactly! You understood it correctly.
+- If package-lock.json exists: use npm ci.
+- If package-lock.json does not exist: use npm install.
+Here is the difference:
+Command	What it does
+npm ci	Installs dependencies using the existing lockfile, keeping versions consistent. It fails if the lockfile is missing or out of sync with package.json.
+npm install	Installs dependencies and can create or update package-lock.json when needed.
+For your project:
+- Backend: package-lock.json exists, so use npm ci.
+- Frontend: package-lock.json exists, so use npm ci too.
+One extra detail: npm ci removes the existing node_modules folder before installing dependencies. This is normally fine inside a fresh Docker image build.
+You can remember it this way: ci = consistent installation from the lockfile; install = flexible installation that can update the lockfile.
+
+Next step: check your my-app structure
+Your project should look like this:
+
+fs-graphql/
+├── library-frontend/       # Actual frontend source
+├── library-backend/        # Actual backend source
+└── my-app/
+    ├── frontend/
+    │   └── dev.Dockerfile
+    ├── backend/
+    │   └── dev.Dockerfile
+    ├── nginx.dev.conf
+    └── docker-compose.dev.yml
+
+
+
+Now, from your current PowerShell terminal, run:
+cd ..\my-app
+Get-ChildItem -Recurse
+
+
+This lets us check that the configuration files are in the right place before writing Docker Compose.
+Remember the key idea: your application code stays in library-frontend and library-backend. The my-app folder contains only the Docker configuration. We'll connect them using the build contexts in Compose.

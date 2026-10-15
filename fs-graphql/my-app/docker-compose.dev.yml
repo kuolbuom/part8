@@ -1,0 +1,32 @@
+services:
+  frontend:
+    build:
+      context: ..
+      dockerfile: my-app/frontend/dev.Dockerfile
+    volumes:
+      - ../library-frontend:/usr/src/app
+      - /usr/src/app/node_modules
+    ports:
+      - "5173:5173"
+
+  backend:
+    build:
+      context: ..
+      dockerfile: my-app/backend/dev.Dockerfile
+    volumes:
+      - ../library-backend:/usr/src/app
+      - /usr/src/app/node_modules
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+
+  nginx:
+    image: nginx:1.29
+    ports:
+      - "8081:80"
+    volumes:
+      - ./nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend

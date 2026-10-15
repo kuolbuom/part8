@@ -34,13 +34,13 @@ const authLink = new ApolloLink((operation, forward) => {
 //client constructor
 //the code creates a new client object, which is then used to send a query to the server
 const httpLink = new HttpLink({
-  uri: "http://127.0.0.1:4000/graphql",
+  uri: "/graphql",
 });
 
 //create the WebSocket link
 const wsLink = new GraphQLWsLink(
   createClient({
-    url: "ws://127.0.0.1:4000/graphql",
+    url: "ws://localhost:8081/graphql",
   }),
 );
 

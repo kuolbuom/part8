@@ -1,0 +1,103 @@
+Step 1: Configure nginx.dev.conf
+Nginx will act as a reverse proxy: it receives requests from your browser and forwards them to the right container.
+Browser
+http://localhost:8080
+
+Nginx container
+Port 8080 on your computer → port 80 in the container
+
+Frontend
+Vite · port 5173
+
+Backend
+GraphQL · port 4000
+
+
+
+1. Open the configuration file
+Open this file in VS Code:
+fs-graphql/my-app/nginx.dev.conf
+It is currently empty, so paste in the following:
+
+events {}
+
+http {
+    server {
+        listen 80;
+
+        location /graphql {
+            proxy_pass http://backend:4000;
+        }
+
+        location / {
+            proxy_pass http://frontend:5173;
+        }
+    }
+}
+
+
+
+Save the file.
+2. Understand the two routes
+- location /graphql forwards GraphQL requests to the backend container.
+- location / forwards all other requests to the Vite frontend container.
+- backend and frontend are the service names we'll use in Docker Compose. Docker's internal network resolves these names to the right containers.
+Important: Nginx will become the browser's entry point on port 8080. In a later step, we'll update the frontend's GraphQL URL to use /graphql through Nginx.
+
+1. events {} — how Nginx handles connections
+events {}
+
+
+The events block configures how Nginx handles connections from clients, such as web browsers.
+- Nginx uses this section to configure its connection-processing behavior.
+- {} means the block is empty, so Nginx uses its default settings.
+- Even though it is empty, the events block is required in a standard, complete Nginx configuration.
+Think of it as setting up the receptionist's ability to receive visitors. We don't need to customize it for our current project.
+2. http {} — how Nginx handles web traffic
+http {
+    server {
+        listen 80;
+    }
+}
+
+
+The http block configures how Nginx handles HTTP web requests and responses.
+Inside it, we can define one or more server blocks. Each server block tells Nginx how to handle requests for a particular listening port or hostname.
+In our project:
+- http {} — sets up the rules for web traffic.
+- server {} — defines a server's request-handling rules.
+- listen 80; — tells Nginx to accept HTTP requests on port 80 inside the container.
+3. How the pieces fit together
+events {}
+Connection handling
+
+http {}
+HTTP web traffic rules
+
+server {}
+Listen on port 80
+
+location /graphql
+Forward to backend
+
+location /
+Forward to frontend
+
+
+
+The complete hierarchy is:
+events {}            # Connection handling
+
+http {               # Web traffic
+    server {         # Server rules
+        listen 80;
+
+        location /graphql {
+            # Backend routing
+        }
+
+        location / {
+            # Frontend routing
+        }
+    }
+}

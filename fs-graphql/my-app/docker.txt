@@ -1,0 +1,306 @@
+First, check your application ports
+In PowerShell, run these commands:
+Select-String -Path ..\library-backend\index.js -Pattern "listen|PORT|ApolloServer"
+Then:
+Copy and run the complete command below, not just the first line:
+Get-ChildItem ..\library-frontend\src -Recurse -File |
+  Select-String -Pattern "localhost:|uri:|VITE_BACKEND_URL"
+What it does:
+- Get-ChildItem finds files.
+- ..\library-frontend\src points to your actual frontend source folder.
+- -Recurse -File searches files in that folder and its subfolders.
+- Select-String searches those files for backend URLs and related settings.
+- | passes the files to the search command.
+If PowerShell displays a >> prompt, it means it is waiting for the rest of a multiline command. Press Ctrl+C to cancel, then paste the complete command again.
+
+Perfect! We found the two important settings in your actual application.
+- Backend port: 4000 (from process.env.PORT || 4000)
+- Frontend GraphQL URL: http://127.0.0.1:4000/graphql
+Now let's fix the Dockerfiles so they copy the correct source code from your existing folders.
+Step 4: Update the frontend Dockerfile
+Open my-app/frontend/dev.Dockerfile and replace its contents with:
+
+FROM node:24
+
+WORKDIR /usr/src/app
+
+COPY library-frontend/package*.json ./
+
+RUN npm ci
+
+COPY library-frontend/ ./
+
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+
+
+
+Step 5: Update the backend Dockerfile
+Open my-app/backend/dev.Dockerfile and replace its contents with:
+
+FROM node:24
+
+WORKDIR /usr/src/app
+
+COPY library-backend/package*.json ./
+
+RUN npm ci
+
+COPY library-backend/ ./
+
+CMD ["npm", "run", "dev"]
+
+
+
+Why did we change COPY?
+Our build context will be the fs-graphql root folder. Therefore, Docker needs the paths library-frontend/... and library-backend/... to find the correct files.
+
+Step 7: Configure docker-compose.dev.yml
+Open:
+fs-graphql/my-app/docker-compose.dev.yml
+Paste this configuration:
+
+services:
+  frontend:
+    build:
+      context: ..
+      dockerfile: my-app/frontend/dev.Dockerfile
+    volumes:
+      - ../library-frontend:/usr/src/app
+      - /usr/src/app/node_modules
+    ports:
+      - "5173:5173"
+
+  backend:
+    build:
+      context: ..
+      dockerfile: my-app/backend/dev.Dockerfile
+    volumes:
+      - ../library-backend:/usr/src/app
+      - /usr/src/app/node_modules
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+
+
+
+Save the file.
+Understand what we just configured
+Your browser
+localhost:5173
+
+Port forwarding
+
+Frontend container
+Vite development server
+
+GraphQL requests will use the backend service
+
+Backend container
+Port 4000 · GraphQL API
+
+
+A few important details:
+- context: .. means Docker builds using the fs-graphql project root as its context.
+- dockerfile: tells Docker where each Dockerfile lives.
+- The volumes connect your local source code to the containers, so code changes can be detected during development.
+- The extra /usr/src/app/node_modules volume helps preserve dependencies installed inside each container.
+Step 8: Validate the Compose file
+From your current PowerShell location, run:
+docker compose -f docker-compose.dev.yml config
+
+
+You should see the resolved configuration without an error.
+Don't start the containers yet. Your frontend still points to http://127.0.0.1:4000/graphql, and we need to change that to a container-friendly URL before testing. Send me the validation output, and we'll do that next.
+
+Step 9: Understand the GraphQL URL
+Your frontend currently uses this in library-frontend/src/main.jsx:
+uri: "http://127.0.0.1:4000/graphql",
+
+
+Because Apollo Client sends GraphQL requests from your browser, 127.0.0.1:4000 points to your computer's port 4000. Our Compose file publishes the backend's port 4000, so this URL can work without changing it.
+The distinction is:
+- Browser → backend: 127.0.0.1:4000/graphql can work because port 4000 is published.
+- Container → container: use the Compose service name, such as http://backend:4000/graphql.
+Step 10: Build and start both containers
+In your PowerShell terminal, make sure you're inside my-app:
+cd C:\Users\Student\Desktop\part8\fs-graphql\my-app
+
+
+Then run:
+docker compose -f docker-compose.dev.yml up --build
+
+
+This command builds the two images and starts the containers. The first build may take a few minutes.
+When it starts, open your browser at:
+- Frontend: http://localhost:5173
+- GraphQL endpoint: http://localhost:4000/graphql
+The GraphQL endpoint may show a message or an error in the browser because it expects GraphQL requests; that alone doesn't mean the server is broken.
+
+Understand the new Nginx service
+- image: nginx:1.29 — uses the Nginx image.
+- 8080:80 — maps port 8080 on your computer to port 80 inside the container.
+- ./nginx.dev.conf:/etc/nginx/nginx.conf:ro — mounts your configuration file into Nginx. The ro means read-only.
+- depends_on — starts the frontend and backend services before Nginx. It does not guarantee that they're ready to accept requests.
+
+Step 3: Validate the configuration
+From your my-app directory, run:
+docker compose -f docker-compose.dev.yml config
+
+
+If it succeeds, start the updated setup:
+docker compose -f docker-compose.dev.yml up --build
+
+
+Keep that terminal open while it runs.
+Then open http://localhost:8080.
+One thing to expect: your frontend may load, but GraphQL requests may not work through Nginx yet because your frontend still uses http://127.0.0.1:4000/graphql. We'll fix that next.
+
+Blocked request. This host ("frontend") is not allowed.
+To allow this host, add "frontend" to `server.allowedHosts` in vite.config.js.
+
+Step 1: Update vite.config.js
+Open your actual frontend configuration file:
+fs-graphql/library-frontend/vite.config.js
+Add server.allowedHosts to the top-level Vite configuration. For example:
+
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    allowedHosts: ["frontend"],
+  },
+});
+
+
+
+Important: If your existing file already has other settings, keep them. Add server: { allowedHosts: ["frontend"] } at the top level, alongside plugins, not inside another setting such as test.
+This allows Vite to accept requests using the hostname frontend, which Nginx uses to reach the frontend container.
+Step 2: Restart the Library app
+In the my-app terminal, stop the current Compose process with Ctrl+C, then run:
+docker compose -f docker-compose.dev.yml up --build
+
+
+Open http://localhost:8081 again.
+
+Let's understand the main error:
+Origin: http://localhost:8081
+Allowed origin: http://localhost:5173
+GraphQL URL: http://127.0.0.1:4000/graphql
+
+
+Your browser is opening the app at port 8081, but your backend currently allows requests from port 5173. Those origins don't match, so the browser blocks the request.
+The better solution is to send GraphQL requests through Nginx, rather than changing CORS settings to allow every port. Then the browser will access both the frontend and GraphQL API through the same origin: http://localhost:8081.
+Step 1: Change the GraphQL URL
+Open library-frontend/src/main.jsx.
+Find this line:
+uri: "http://127.0.0.1:4000/graphql",
+
+
+Change it to:
+uri: "/graphql",
+
+
+Why does this work? The browser sends the request to:
+http://localhost:8081/graphql
+Nginx then forwards it internally to:
+http://backend:4000/graphql
+The browser no longer calls port 4000 directly, so the request uses the same origin as the frontend and avoids this CORS problem.
+Step 2: Test it
+Save main.jsx, then refresh http://localhost:8081.
+Your Vite development server should detect the source change automatically. You shouldn't need to rebuild.
+- If the books and authors load, we've fixed the main issue.
+- The AUTHORS RESULT: undefined and allAuthors errors may disappear once the GraphQL query succeeds.
+- The Vite WebSocket fallback warning is a separate Nginx configuration issue. We can fix that afterward if it persists.
+Try Step 1 and tell me what happens after refreshing the page.
+
+Why?
+- location /graphql sends API and subscription requests to your backend.
+- location / sends everything else—including the frontend and Vite's HMR WebSocket—to Vite.
+- The Upgrade and Connection headers allow WebSocket connections to be upgraded from HTTP.
+Next step
+Save nginx.dev.conf, then restart the services so Nginx loads the updated configuration:
+docker compose -f docker-compose.dev.yml up -d --force-recreate nginx
+
+
+Then refresh http://localhost:8081 and check whether authors and books load. If any errors remain, send me the new console output.
+
+Your Nginx container has started, and the PowerShell search found no old URLs in library-frontend/src matching the two patterns. But the browser console still shows App.jsx:70 sending a request to http://127.0.0.1:4000/graphql.
+That means we need to inspect the actual code at App.jsx:70, rather than changing Nginx again. The Authors.jsx error is likely a consequence of the failed GraphQL request: data is undefined because the request never succeeds.
+Step 1: Inspect App.jsx
+Run this in your current PowerShell terminal, which is already inside my-app:
+Get-Content ..\library-frontend\src\App.jsx | Select-Object -First 100
+
+
+Look for the code around line 70 that sends the GraphQL request.
+Step 2: Search again using a simpler pattern
+Get-ChildItem ..\library-frontend -Recurse -File |
+  Select-String -Pattern "127.0.0.1:4000|localhost:4000"
+
+
+This searches the whole frontend project, not just src.
+
+I checked the pasted output. Most of it is from Apollo Client's node_modules documentation and examples, which we should not edit. We still need to find the request in your own application code.
+Run these two commands in your current PowerShell terminal.
+1. Show App.jsx around the failing line:
+Get-Content ..\library-frontend\src\App.jsx | Select-Object -First 100
+
+
+2. Search your application source only, excluding dependencies:
+Get-ChildItem ..\library-frontend\src -Recurse -File |
+  Select-String -Pattern "graphql|HttpLink|ApolloClient|createHttpLink"
+
+
+The important clue is App.jsx:70: something there is still making a request to the old backend URL. Paste the results of these commands, and we'll correct the exact line. Don't change your Nginx configuration yet.
+
+Step 1: Show me main.jsx
+Run this command from your current directory:
+Get-Content ..\library-frontend\src\main.jsx
+
+
+Please paste the output here.
+Step 2: Check the running frontend container
+Then run:
+docker compose ps
+
+
+And:
+docker compose logs --tail=30 frontend
+
+
+Paste those outputs too.
+Why are we checking these?
+Your setup has three parts:
+- Browser: sends requests to localhost:8081.
+- Nginx: forwards /graphql requests to backend:4000.
+- Backend: handles GraphQL requests on port 4000.
+Your main.jsx already appears to use the correct HTTP URL. So we should verify the complete Apollo configuration and running containers before changing anything else. Don't change the CORS settings or Nginx configuration yet.
+
+hat means the browser should send requests to http://localhost:8081/graphql, and Nginx should forward them to the backend. We should not change this code yet.
+The Docker commands failed for a simple reason: you ran them inside my-app, but Docker Compose did not automatically find docker-compose.dev.yml. You need to specify the file with -f.
+Step 1: Check your containers
+You are already in:
+C:\Users\Student\Desktop\part8\fs-graphql\my-app
+
+
+Run:
+docker compose -f docker-compose.dev.yml ps
+
+
+Then:
+docker compose -f docker-compose.dev.yml logs --tail=30 frontend
+
+
+And:
+docker compose -f docker-compose.dev.yml logs --tail=30 backend
+
+
+Step 2: Rebuild the frontend
+Because the browser still reports the old URL, let's ensure the frontend container uses your current source code.
+Run:
+docker compose -f docker-compose.dev.yml up -d --build frontend
+
+
+This rebuilds and starts the frontend service. It does not change your source code.
