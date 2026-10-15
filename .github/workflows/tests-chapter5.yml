@@ -40,6 +40,8 @@ jobs:
 
       - name: Start library frontend
         working-directory: fs-graphql/library-frontend
+        env:
+          VITE_GRAPHQL_URI: http://127.0.0.1:4000/graphql
         run: |
           npm run dev -- --host 0.0.0.0 > frontend.log 2>&1 &
           sleep 10
