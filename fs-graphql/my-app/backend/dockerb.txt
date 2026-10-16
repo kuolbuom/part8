@@ -1,0 +1,64 @@
+Step 8 — Move to the backend production Dockerfile
+Now we'll follow the same one-step-at-a-time process for the backend.
+First, inspect your backend development Dockerfile and package scripts. From my-app, run:
+Get-Content backend\dev.Dockerfile
+Get-Content ..\library-backend\package.json
+
+Perfect. We now know how your backend works. Your application uses Node.js, Express 5, Apollo Server, and MongoDB through Mongoose.
+Your package.json has two important scripts:
+- dev: runs node --watch index.js for development.
+- start: runs node index.js for production.
+For production, we'll use npm start, not npm run dev.
+Step 9 — Create the backend production Dockerfile
+From your current my-app directory, open the file:
+notepad backend\Dockerfile
+
+
+Paste this:
+
+FROM node:24
+
+WORKDIR /usr/src/app
+
+COPY library-backend/package*.json ./
+
+RUN npm ci --omit=dev
+
+COPY library-backend/ ./
+
+CMD ["npm", "start"]
+
+
+
+Save it as Dockerfile inside my-app/backend.
+Understand the differences from development
+Instruction	Purpose
+FROM node:24	Uses Node.js to run your backend.
+WORKDIR	Sets the working directory inside the container.
+COPY ... package*.json	Copies the package files first for efficient dependency installation.
+RUN npm ci --omit=dev	Installs production dependencies only.
+COPY library-backend/ ./	Copies your backend source code.
+CMD ["npm", "start"]	Starts the production server using index.js.
+We keep the same build-context approach as the frontend: Docker will build from fs-graphql, so it can access library-backend.
+Step 10 — Verify the file
+Run:
+Get-Content backend\Dockerfile
+
+Great! ✅ Your backend production Dockerfile is correct for the structure we've confirmed.
+Step 11 — Build the backend image
+From your current my-app directory, run:
+docker build -f backend/Dockerfile -t library-backend-prod ..
+
+
+Remember the final .. is important. It sets fs-graphql as the build context, so Docker can copy files from library-backend/.
+What should happen?
+1. Docker downloads or reuses the Node.js 24 image.
+2. It installs production dependencies using npm ci --omit=dev.
+3. It copies your backend source code.
+4. It creates the library-backend-prod image.
+One important note: Building the image doesn't require MongoDB to be running. We'll connect the backend to MongoDB when we configure production Docker Compose.
+
+Excellent! ✅ Your backend production image library-backend-prod built successfully. All 11 build steps finished, including installing production dependencies.
+So far, both production images build successfully:
+- library-frontend-prod — React/Vite served by Nginx.
+- library-backend-prod — Node.js backend using npm start.

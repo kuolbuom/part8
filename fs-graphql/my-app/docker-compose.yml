@@ -1,0 +1,24 @@
+services:
+  frontend:
+    build:
+      context: ..
+      dockerfile: my-app/frontend/Dockerfile
+    image: library-frontend-prod
+
+  backend:
+    build:
+      context: ..
+      dockerfile: my-app/backend/Dockerfile
+    image: library-backend-prod
+    env_file:
+      - ../library-backend/.env
+
+  nginx:
+    image: nginx:1.29-alpine
+    ports:
+      - "8082:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend

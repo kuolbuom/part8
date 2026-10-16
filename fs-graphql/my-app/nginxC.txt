@@ -1,0 +1,76 @@
+Step 18 — Inspect your development Nginx configuration
+Before creating the production configuration, let's look at how your existing Nginx routes requests. From your current my-app directory, run:
+Get-Content .\nginx.dev.conf
+
+
+Paste the output here.
+Why are we doing this? We want to understand your working development setup before creating nginx.conf for production. The production Nginx will serve as the entry point: it will route frontend requests to the frontend container and /graphql requests—including WebSocket subscriptions—to the backend container.
+We will configure that next, one step at a time.
+
+Great. Your nginx.dev.conf confirms the routing pattern we need. Let's keep it unchanged and create the production version separately.
+Step 19 — Configure production Nginx
+In development, Nginx forwards frontend requests to Vite on port 5173. In production, your frontend Dockerfile builds the React app into static files served by Nginx on port 80. So the production proxy will forward requests to frontend:80 instead.
+The production routes will be:
+Browser
+http://localhost:8080
+
+
+Production Nginx
+Port 8080 on your computer → port 80 in the container
+
+/
+
+Frontend
+frontend:80
+React static files
+
+
+/graphql
+
+Backend
+backend:4000
+GraphQL and WebSocket subscriptions
+
+
+
+
+1. Open the production configuration file
+From your current my-app directory, run:
+notepad .\nginx.conf
+
+
+Paste in this configuration:
+
+events {}
+
+http {
+    server {
+        listen 80;
+
+        location /graphql {
+            proxy_pass http://backend:4000;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_read_timeout 86400;
+        }
+
+        location / {
+            proxy_pass http://frontend:80;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+        }
+    }
+}
+
+
+
+Save the file and close Notepad.
+2. Understand the important changes
+- proxy_pass http://frontend:80; sends normal browser requests to the production frontend container.
+- proxy_pass http://backend:4000; sends GraphQL requests to the backend. Docker Compose lets containers reach one another using their service names.
+- Upgrade and Connection headers allow WebSocket connections, which your GraphQL subscriptions need.
+- proxy_read_timeout 86400; allows long-lived WebSocket connections to remain open without Nginx timing them out quickly.
+We have not started the production containers yet. First, we need to configure the production Compose file and ensure the backend receives the correct database connection and JWT secret.
+Once you've saved nginx.conf, tell me, and we'll move to the next step.

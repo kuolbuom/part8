@@ -1,0 +1,409 @@
+Step 12 — Check how your backend connects to MongoDB
+Before we create docker-compose.yml, we need to understand how the backend starts and connects to the database. We shouldn't run it in isolation if it requires MongoDB.
+From your current my-app directory, run:
+Get-Content ..\library-backend\index.js
+
+
+Also check whether your backend has a .env file:
+Test-Path ..\library-backend\.env
+
+
+If the result is True, don't paste any secrets or passwords. Just tell me that it exists.
+
+Good, we've found an important detail before configuring production.
+Your backend's index.js does two things in order:
+1. Reads MONGODB_URI from the environment.
+2. Connects to MongoDB before starting the GraphQL server on port 4000 by default.
+await connectToDatabase(MONGODB_URI);
+await startServer(PORT);
+
+
+That means the production backend needs a valid MongoDB connection string. In Docker Compose, we'll provide it through an environment variable rather than copying your local .env file into the image.
+Your .env file exists, so don't share its secrets or passwords.
+Step 13 — Check the database connection code
+From your current my-app directory, run:
+Get-Content ..\library-backend\db.js
+
+
+Then run:
+Get-Content ..\library-backend\server.js
+
+
+These will help us confirm how MongoDB is connected and how the GraphQL server starts.
+Why this matters: In production, Docker Compose will give the backend a MongoDB address using the database service name, not localhost. We'll configure that correctly before starting the complete application.
+
+Great. We've confirmed two important production requirements.
+1. MongoDB: db.js uses Mongoose and exits if the database connection fails. We'll provide MONGODB_URI through Docker Compose.
+2. GraphQL and subscriptions: Your server uses /graphql for both HTTP GraphQL and WebSocket subscriptions. Nginx must eventually proxy both correctly.
+I also noticed this in server.js:
+cors({
+  origin: "http://localhost:5173",
+})
+
+
+Your production frontend will be accessed through Nginx, not directly through Vite on port 5173. We'll revisit that when testing the complete setup.
+Step 14 — Check the environment variable names
+Before writing production Compose, let's check which environment variables your backend expects.
+From my-app, run:
+Select-String -Path ..\library-backend\*.js, ..\library-backend\**\*.js -Pattern "process\.env\."
+
+
+This searches the backend JavaScript files for environment variables such as MONGODB_URI, PORT, and JWT_SECRET.
+
+Good! We found the three environment variables your backend needs:
+Variable	Purpose
+MONGODB_URI	Connects the backend to MongoDB
+PORT	Sets the backend listening port; defaults to 4000
+JWT_SECRET	Signs and verifies authentication tokens
+The PowerShell warnings happened because the recursive search also reached some folders inside node_modules. They don't affect our findings.
+Step 15 — Check the frontend's GraphQL URL
+Before configuring Nginx, we need to know how the frontend currently connects to GraphQL.
+From my-app, run:
+Select-String -Path ..\library-frontend\src\*.jsx, ..\library-frontend\src\*.js, ..\library-frontend\src\*.ts, ..\library-frontend\src\*.tsx -Pattern "localhost:4000|localhost:8081|/graphql|ws://|wss://"
+
+
+If PowerShell reports that some file patterns don't exist, that's okay.
+We're checking whether your frontend uses a URL such as http://localhost:4000/graphql or a relative URL such as /graphql, and whether it configures a separate WebSocket connection for subscriptions.
+Why this matters: In production, the browser should connect through Nginx, which will route requests to the backend. We need the correct URL strategy before writing the production Nginx configuration.
+
+Excellent! We found the final frontend detail we needed before production configuration.
+Your main.jsx currently uses:
+uri: import.meta.env.VITE_GRAPHQL_URI || "/graphql",
+
+
+This is good for production because /graphql sends HTTP GraphQL requests to the same origin as the frontend, through Nginx.
+However, your WebSocket connection is currently hardcoded:
+url: "ws://localhost:8081/graphql",
+
+
+That is a development URL. In production, we need the WebSocket connection to go through the same Nginx entry point as the frontend, using ws:// or wss:// depending on whether the site uses HTTP or HTTPS.
+Step 16 — Inspect the full Apollo client configuration
+Let's see the surrounding code before changing anything.
+Run:
+Get-Content ..\library-frontend\src\main.jsx
+
+Thanks. Now we can see exactly how your GraphQL client works.
+Your frontend has two separate communication paths:
+- HTTP: VITE_GRAPHQL_URI || "/graphql" — already supports a relative production URL.
+- WebSocket: ws://localhost:8081/graphql — hardcoded to your development address, so it needs to become environment-aware for production.
+We'll preserve your development setup while making production use the same host as the frontend. For a local production deployment, that means ws://localhost:8080/graphql if Nginx publishes port 8080; with HTTPS in deployment, it should use wss://.
+Step 17 — Fix the WebSocket URL without breaking development
+Open your frontend source file:
+notepad ..\library-frontend\src\main.jsx
+
+
+Find this existing code:
+const wsLink = new GraphQLWsLink(
+  createClient({
+    url: "ws://localhost:8081/graphql",
+  }),
+);
+
+
+Replace only that section with:
+
+const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+
+const wsUrl = import.meta.env.PROD
+  ? `${wsProtocol}//${window.location.host}/graphql`
+  : "ws://localhost:8081/graphql";
+
+const wsLink = new GraphQLWsLink(
+  createClient({
+    url: wsUrl,
+  }),
+);
+
+
+
+Why this works
+- In development, it continues connecting to ws://localhost:8081/graphql, preserving your existing setup.
+- In production, it connects to /graphql through the same host serving the frontend.
+- If the production site uses HTTPS, it automatically uses wss:// for the WebSocket connection.
+Save the file.
+Don't rebuild the production image yet. The frontend Docker image must be rebuilt after this source change, and we'll do that when we configure the production setup.
+For now, tell me when you've replaced and saved that section. Then we'll move to the production nginx.conf file.
+
+Good. Your production nginx.conf is now separate from nginx.dev.conf, so your existing development setup remains untouched.
+Next, before we write docker-compose.yml, we need to check which environment variables your backend requires. This matters because the backend needs its MongoDB connection and JWT secret to start correctly.
+Step 20 — Check your backend environment variable names
+From your current my-app directory, run this PowerShell command:
+Get-Content ..\library-backend\.env | ForEach-Object {
+    if ($_ -match '^\s*([^#=]+)=') {
+        $matches[1].Trim()
+    }
+}
+
+
+This displays only the variable names, not their values, so your database credentials and JWT secret remain private.
+
+Perfect. We have confirmed that your backend uses three environment variables:
+Variable	Purpose
+MONGODB_URI	Connects the backend to MongoDB
+PORT	Sets the backend listening port
+JWT_SECRET	Signs and verifies authentication tokens
+Step 21 — Check your current MongoDB connection type
+Before writing docker-compose.yml, we need to know whether your .env connects to a MongoDB database running locally, in Docker, or in MongoDB Atlas (cloud). That determines how we configure the production database.
+Run this command from your current my-app directory. It reveals only the connection type, not your credentials or full connection string:
+Select-String -Path ..\library-backend\.env -Pattern '^MONGODB_URI=' |
+    ForEach-Object {
+        if ($_.Line -match '@([^/:?]+)') {
+            if ($matches[1] -match 'mongodb\.net$') {
+                "MongoDB Atlas (cloud)"
+            } elseif ($matches[1] -eq 'mongo') {
+                "Docker Compose service named mongo"
+            } elseif ($matches[1] -in @('localhost', '127.0.0.1')) {
+                "Local MongoDB"
+            } else {
+                "Other MongoDB host"
+            }
+        } elseif ($_.Line -match '^MONGODB_URI=mongodb://') {
+            "MongoDB URI without a username/password section"
+        } else {
+            "Connection type needs another check"
+        }
+    }
+
+
+Paste the result here. . We'll use it to choose the correct database configuration without exposing your .env secrets or unnecessarily changing your existing setup.
+
+Good. Your backend currently connects to MongoDB Atlas in the cloud. That means we should preserve that connection for now rather than introduce a new MongoDB container and risk connecting to an empty database.
+Step 22 — Prepare production environment variables
+We'll configure Docker Compose to read your existing .env file without copying it into the production image. This keeps the database URI and JWT secret out of the Dockerfile.
+First, let's check whether your .env file is ignored by Git, so you don't accidentally commit secrets.
+Run this from my-app:
+git check-ignore ..\library-backend\.env
+
+
+- If it prints library-backend/.env or a similar path, Git is ignoring the file.
+- If it prints nothing, it may not be ignored.
+Paste the result here. We'll decide the next step based on that output, then build the production Compose configuration using your existing Atlas database.
+
+Excellent. Git is ignoring library-backend\.env, which helps protect your secrets from being committed. We'll keep using MongoDB Atlas and leave your existing development Compose file unchanged.
+Step 23 — Create the production docker-compose.yml
+We'll start by defining three services:
+- frontend — builds your React production image.
+- backend — builds your Node.js production image and reads the environment variables from your existing .env.
+- nginx — exposes the application on port 8080 and routes requests between the frontend and backend.
+First, open the production Compose file:
+notepad .\docker-compose.yml
+
+
+Paste this configuration:
+
+services:
+  frontend:
+    build:
+      context: ..
+      dockerfile: my-app/frontend/Dockerfile
+    image: library-frontend-prod
+
+  backend:
+    build:
+      context: ..
+      dockerfile: my-app/backend/Dockerfile
+    image: library-backend-prod
+    env_file:
+      - ../library-backend/.env
+
+  nginx:
+    image: nginx:1.29-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+
+
+
+Save the file.
+Why this configuration works
+- context: .. tells Docker to use the fs-graphql repository root as the build context, so the Dockerfiles can copy files from library-frontend and library-backend.
+- env_file passes your existing backend environment variables into the backend container without placing their values in the Compose file.
+- The external Nginx container is the only service publishing a port to your computer. The frontend and backend communicate with it through Docker's internal network.
+One important note: your Atlas database must allow connections from the machine running Docker. We can troubleshoot that if it comes up.
+After saving, run this validation command from my-app:
+docker compose config
+
+
+This checks whether Docker Compose can parse and resolve the configuration. It may display environment variable values, so don't paste any output containing your credentials or JWT secret. Just tell me whether it succeeds or reports an error.
+
+Great! Your production docker-compose.yml is valid. That means Docker Compose can understand the three services and their configuration.
+Step 24 — Build the production images
+Now we'll build the frontend and backend production images. This step does not start the containers yet.
+From your current directory:
+C:\Users\Student\Desktop\part8\fs-graphql\my-app
+Run:
+docker compose build
+
+
+Docker will:
+1. Build the frontend using frontend/Dockerfile, compile React into production static files, and prepare Nginx to serve them.
+2. Build the backend using backend/Dockerfile and install its production dependencies.
+The first build may take a few minutes.
+Don't run docker compose up yet. After the build finishes, tell me whether it succeeded or share the error message if it failed.
+
+
+Excellent! Both production images have built successfully. Now we'll start the containers and test the application.
+Step 25 — Start the production environment
+From your current my-app directory, run:
+docker compose up -d
+
+
+The -d means detached mode: Docker runs the containers in the background while you keep using PowerShell.
+Next, check their status:
+docker compose ps
+
+
+You should see three services: frontend, backend, and nginx.
+- frontend serves the built React files.
+- backend runs your GraphQL API and connects to MongoDB Atlas.
+- nginx exposes the application at port 8080.
+Paste the output of docker compose ps here. We'll verify that the containers are running before testing the browser and GraphQL API.
+
+Good progress! Your frontend and backend production containers have started successfully. The problem is only with Nginx:
+Bind for 0.0.0.0:8080 failed: port is already allocated
+
+
+What this means: another container or application is already using port 8080 on your computer. This is a port conflict, not a Docker image build failure.
+Step 26 — Find what is using port 8080
+Since your earlier development setup also used port 8080, let's check which Docker containers are running.
+Run:
+docker ps --format "table {{.Names}}\t{{.Ports}}"
+
+
+Look for a container whose port mapping includes 8080->80 or 0.0.0.0:8080.
+Paste the output here, and we'll decide whether to stop the old container or use another port. Don't stop anything yet—we want to avoid interrupting your working development setup unnecessarily.
+
+
+Great! We found the conflict. Your Full Stack Open Part 12 todo-app Nginx container is already using port 8080:
+todo-app-nginx-1    0.0.0.0:8080->80/tcp
+
+
+We won't stop it because it belongs to your working Todo application.
+Step 27 — Change the production app's port
+We'll run your Part 8 library application on port 8082, while leaving the Todo app on 8080.
+In your current directory:
+C:\Users\Student\Desktop\part8\fs-graphql\my-app
+
+
+Open docker-compose.yml and find the Nginx port mapping:
+ports:
+  - "8080:80"
+
+
+Change it to:
+ports:
+  - "8082:80"
+
+
+Understand the mapping:
+- 8082 is the port you open in your computer's browser.
+- 80 is the port Nginx listens on inside its container.
+- The frontend and backend still communicate through Docker's internal network.
+Step 28 — Start the production setup again
+Run:
+docker compose up -d
+
+
+Then check the containers:
+docker compose ps
+
+
+You should see the Nginx container running with a port mapping similar to:
+0.0.0.0:8082->80/tcp
+
+
+Send me the output of docker compose ps. We'll verify that Nginx starts successfully before testing the library application in your browser.
+
+You're thinking in the right direction! Let's distinguish the ports for your Full Stack Open Part 8 library app and your Part 12 Todo app.
+The important point is that development and production can use different ports, but Docker doesn't automatically assign a different port to production. We choose the host port in docker-compose.yml.
+1. Your port setup
+Application	Environment	Host port
+Library app (Part 8)	Development	8081
+Library app (Part 8)	Production	8082
+Todo app (Part 12)	Development/production setup	8080
+Your current docker ps output confirms that the Todo app is using 8080. Your Part 8 development setup previously used 8081 for its WebSocket/backend configuration, but let's not assume that was also the Nginx browser port.
+2. Check your existing development configuration
+From your current my-app directory, run:
+Get-Content .\docker-compose.dev.yml
+
+
+This lets us confirm which host port your development Nginx actually uses before changing anything.
+If development already uses 8081, then 8082 is a sensible port for production. We can keep both environments running without interfering with each other.
+Send me that output, and we'll confirm the port mapping before proceeding.
+
+Perfect! Now we have confirmed it. Your understanding was correct: development uses port 8081, so production should use 8082.
+Your final port plan
+
+Part 8 — Development
+Vite frontend + development backend + Nginx
+http://localhost:8081
+
+
+
+
+Part 8 — Production
+Built frontend + production backend + Nginx
+http://localhost:8082
+
+
+
+
+Part 12 — Todo app
+Your existing Docker setup
+http://localhost:8080
+
+
+
+Next step
+In docker-compose.yml (not docker-compose.dev.yml), make sure the production Nginx port mapping is:
+ports:
+  - "8082:80"
+
+
+Then, from your current my-app directory, run:
+docker compose up -d
+
+
+Check the result:
+docker compose ps
+
+
+Mental model: 8081 and 8082 are ports on your computer. Both Nginx containers listen on port 80 internally, but Docker maps them to different host ports so they can run side by side. Your development configuration stays unchanged.
+
+Excellent! 🎉 Your Part 8 production setup is now reachable on port 8082.
+Open your library application here:
+http://localhost:8082
+You now have separate environments:
+- Development: http://localhost:8081
+- Production: http://localhost:8082
+- Part 12 Todo app: http://localhost:8080
+Next step: Verify production functionality
+Seeing the page load is a good sign. Let's check that the backend and GraphQL connection work too.
+In PowerShell, run this from your my-app directory:
+docker compose logs backend --tail 40
+
+
+Check for database connection errors or other startup errors. Don't share any secret values if they appear in the logs.
+Then, in your browser, test whether the library loads its data and whether adding a book or author works. Also check whether live updates work if your app uses GraphQL subscriptions.
+Send me the backend log output if anything fails, and we'll debug it one step at a time.
+
+Yes! 🎉 Congratulations! You've completed Full Stack Open Part 8, Exercise 23 — My containerized prod env.
+You worked through several important production concepts, not just writing Dockerfiles.
+What you've accomplished
+- Production Dockerfiles: Built the frontend and backend images.
+- Multi-stage frontend build: Used Node.js to build the frontend and Nginx to serve the static production files.
+- Docker Compose: Coordinated the frontend, backend, and Nginx containers.
+- Nginx reverse proxy: Routed /graphql requests to the backend and other requests to the frontend.
+- GraphQL subscriptions: Configured WebSocket forwarding and verified that the connection was established.
+- Environment separation: Kept development on port 8081 and production on port 8082, without interfering with your Part 12 Todo app on port 8080.
+Your final setup
+Environment	URL	Status
+Part 8 development	http://localhost:8081	Working
+Part 8 production	http://localhost:8082	Working
+Part 12 Todo app	http://localhost:8080	Preserved
+One final recommendation: before moving on, check that your books and authors load, mutations work, and subscriptions update correctly. If those pass too, you can confidently mark the exercise complete.
+The most important lesson: In production, the browser talks to Nginx, and Nginx routes requests to the correct service inside Docker's network. You don't need to expose every service directly to your computer.

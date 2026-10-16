@@ -38,9 +38,16 @@ const httpLink = new HttpLink({
 });
 
 //create the WebSocket link
+
+const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+
+const wsUrl = import.meta.env.PROD
+  ? `${wsProtocol}//${window.location.host}/graphql`
+  : "ws://localhost:8081/graphql";
+
 const wsLink = new GraphQLWsLink(
   createClient({
-    url: "ws://localhost:8081/graphql",
+    url: wsUrl,
   }),
 );
 

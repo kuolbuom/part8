@@ -1,0 +1,114 @@
+Good! Now we have confirmed your frontend uses React + Vite, and its production build command is npm run build.
+We'll create only my-app/frontend/Dockerfile in this step.
+Step 1: Create the production Dockerfile
+You are currently in:
+C:\Users\Student\Desktop\part8\fs-graphql\my-app\frontend
+
+
+Open a new file:
+notepad Dockerfile
+
+
+Paste this content:
+
+# Stage 1: Build the frontend
+FROM node:24 AS build
+
+WORKDIR /usr/src/app
+
+COPY library-frontend/package*.json ./
+
+RUN npm ci
+
+COPY library-frontend/ ./
+
+RUN npm run build
+
+# Stage 2: Serve the production files
+FROM nginx:1.29-alpine
+
+COPY --from=build /usr/src/app/dist /usr/share/nginx/html
+
+
+
+Save the file as Dockerfile, making sure Notepad does not save it as Dockerfile.txt.
+Step 2: Understand each part
+Stage 1 — Build with Node.js
+- FROM node:24 AS build gives us Node.js and names this stage build.
+- WORKDIR sets the working directory inside the container.
+- COPY brings the frontend's package files into the image.
+- RUN npm ci installs the exact dependencies recorded in the lockfile.
+- COPY library-frontend/ ./ copies your React source code.
+- RUN npm run build creates the production files in dist/.
+Stage 2 — Serve with Nginx
+- FROM nginx:1.29-alpine starts a separate, lightweight Nginx image.
+- COPY --from=build ... copies only the built dist files from Stage 1.
+This is a multi-stage build. The final image serves the built frontend; it does not need Node.js or the original source files.
+Step 3: Stop here and verify
+Don't build the image yet. Your Dockerfile copies from library-frontend, which is outside the my-app/frontend directory. Therefore, the build context must be set correctly later in docker-compose.yml.
+
+tep 1.1 — Check the frontend lockfile
+From your current directory, run:
+Test-Path ..\..\library-frontend\package-lock.json
+
+Step 2 — Verify the production build locally
+Before we configure Docker Compose, let's confirm the frontend builds successfully.
+From your current directory, run:
+cd ..\..\library-frontend
+npm ci
+npm run build
+
+
+What these commands do:
+- npm ci installs dependencies using your lockfile.
+- npm run build runs Vite and generates the production files in dist/.
+Afterward, check that the build output exists:
+Test-Path .\dist
+
+
+It should return True.
+
+Step 4 — Finish the frontend production Dockerfile setup
+Before we build, there's one correction to make to our plan: the Dockerfile's COPY paths are correct only when the build context is fs-graphql, the parent of my-app.
+Your production setup will use this relationship:
+- Build context: .. from my-app
+- Dockerfile: my-app/frontend/Dockerfile
+- Frontend source: library-frontend/
+We don't need to change the Dockerfile you created.
+Now, let's inspect your existing development Compose file to understand how your current paths are configured.
+Run:
+Get-Content docker-compose.dev.yml
+
+Excellent! Now we have confirmed that your development Compose file already uses the correct build context: .. points to fs-graphql, allowing Docker to access both library-frontend and library-backend.
+We'll use the same path strategy for production. Your development Compose file will remain unchanged.
+Step 5 — Build the frontend production image
+Before writing production Compose, let's test the frontend Dockerfile by itself. From your current my-app directory, run:
+docker build -f frontend/Dockerfile -t library-frontend-prod ..
+
+
+Understand the command
+Part	Meaning
+docker build	Build a Docker image
+-f frontend/Dockerfile	Use your production Dockerfile
+-t library-frontend-prod	Name the image
+..	Use fs-graphql as the build context
+The final .. is important: it makes library-frontend/ available to the COPY instructions.
+Expected result: Docker installs dependencies, runs npm run build, and copies the resulting dist files into the Nginx image.
+
+Step 6 — Test the production frontend container
+Before moving to the backend, let's verify that Nginx actually serves your built frontend.
+You're currently in my-app. Run:
+docker run -d --name frontend-prod-test -p 8082:80 library-frontend-prod
+
+
+This starts a container from the image you just built.
+Now test it:
+Invoke-WebRequest http://localhost:8082
+
+
+You should receive an HTTP 200 response if Nginx is serving the frontend successfully.
+You can also open this address in your browser:
+http://localhost:8082
+One important detail: the frontend page might load even if the GraphQL backend is not running yet. We'll connect the backend later.
+After testing, clean up the temporary container:
+docker rm -f frontend-prod-test
